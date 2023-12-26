@@ -8,4 +8,4 @@ The package containing useful extras for Python - things that shold be in the st
 """
 
 from .tools import *
-
+from .typing import *
