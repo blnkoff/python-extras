@@ -1,12 +1,27 @@
 import re
+from typing import MutableMapping, Mapping, Any
 
 __all__ = [
     'snake_case',
     'camel_case',
     'pascal_case',
+    'find_by_key',
     'constant_case',
     'kebab_case'
 ]
+
+
+def find_by_key(__dict: MutableMapping | Mapping, user_key: Any) -> Any | None:
+    if user_key in __dict:
+        return __dict[user_key]
+
+    for key, value in __dict.items():
+        if isinstance(value, dict):
+            return find_by_key(value, user_key)
+        elif isinstance(value, list) or isinstance(value, tuple) and isinstance(value[0], dict):
+            return find_by_key(value[0], user_key)
+
+    return None
 
 
 def snake_case(s: str) -> str:

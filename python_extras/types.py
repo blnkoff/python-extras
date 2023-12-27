@@ -1,13 +1,17 @@
 from collections import UserDict
-from typing import Any, Literal, Type, TypedDict, get_args, Optional, Callable, Self, Union
-from .tools import *
+from typing import Any, Literal, Type, TypedDict, get_args, Optional, Callable, Self, Union, Mapping, MutableMapping
+from python_extras.tools import *
 
 __all__ = [
     'in_literal',
     'is_typed_dict',
     'SnakedDict',
-    'CameledDict'
+    'CameledDict',
+    'is_decimal',
+    'validate_number'
 ]
+
+_Mapping = Union[Mapping, MutableMapping]
 
 
 def in_literal(value: Any, expected_type: Literal) -> bool:
@@ -26,8 +30,38 @@ def is_typed_dict(value: Any, typed_dict: Type[TypedDict]) -> bool:
     return typed_dict_keys == value_keys
 
 
+def is_decimal(input_string: str) -> bool:
+    try:
+        number = float(input_string)
+        fraction_length = len(input_string.split('.')[1])
+        is_float = input_string == str(format(number, f'.{fraction_length}f'))
+    except (ValueError, AttributeError, IndexError):
+        is_float = False
+
+    try:
+        is_integer = input_string.isdecimal()
+    except (ValueError, AttributeError):
+        is_integer = False
+
+    return is_float or is_integer
+
+
+def validate_number(input_string: str) -> float | int | str:
+    if is_decimal(input_string):
+        try:
+            int_value = int(input_string)
+        except ValueError:
+            int_value = None
+
+        float_value = float(input_string)
+        value = int_value if int_value == float_value else float_value
+        return value
+    else:
+        return input_string
+
+
 class _MultiCaseDict(UserDict):
-    def __init__(self, __dict: dict | Self, case_handler: Callable[[str], str]):
+    def __init__(self, __dict: _Mapping | Self, case_handler: Callable[[str], str]):
         user_cased_dict = __dict if __dict else {}
 
         cased_dict = dict()
@@ -51,18 +85,24 @@ class _MultiCaseDict(UserDict):
     @classmethod
     def recursive_case(
             cls,
-            __dict: dict,
+            __dict: _Mapping,
             case_handler: Callable[[str], str]
     ) -> Self:
         user_dict = __dict
         new_dict = {}
         for key, value in user_dict.items():
-            if isinstance(value, Union[dict, _MultiCaseDict]):
-                new_dict[key] = _MultiCaseDict(value, case_handler)
+            if isinstance(value, _Mapping | _MultiCaseDict):
+                for nested_key, nested_value in value.items():
+                    if isinstance(nested_value, _Mapping | _MultiCaseDict):
+                        value[nested_key] = cls.recursive_case(nested_value, case_handler)
+
+                new_dict[key] = cls(value, case_handler)
             elif isinstance(value, list):
                 new_dict[key] = [
-                    _MultiCaseDict(item, case_handler) if isinstance(item, Union[dict, _MultiCaseDict]) else item for
-                    item in value]
+                    cls.recursive_case(item, case_handler)
+                    if isinstance(item, _Mapping)
+                    else item for item in value
+                ]
             else:
                 new_dict[key] = value
 
