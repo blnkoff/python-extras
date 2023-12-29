@@ -34,9 +34,8 @@ def is_typed_dict(value: Any, typed_dict: Type[TypedDict]) -> bool:
 def is_decimal(input_string: str) -> bool:
     exceptions = (ValueError, AttributeError, IndexError, TypeError)
     try:
-        number = float(input_string)
-        fraction_length = len(input_string.split('.')[1])
-        is_float = input_string == str(format(number, f'.{fraction_length}f'))
+        float(input_string)
+        is_float = True
     except exceptions:
         is_float = False
 

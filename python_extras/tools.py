@@ -78,3 +78,4 @@ def kebab_case(s: str) -> str:
                lambda mo: ' ' + mo.group(0).lower(), s)
     s = '-'.join(s.split())
     return s
+
