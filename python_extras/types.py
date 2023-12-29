@@ -99,12 +99,20 @@ class _MultiCaseDict(UserDict):
             if isinstance(value, _Mapping | _MultiCaseDict):
                 for nested_key, nested_value in value.items():
                     if isinstance(nested_value, _Mapping | _MultiCaseDict):
-                        value[nested_key] = cls.recursive_case(nested_value, case_handler)
+                        value[nested_key] = cls.recursive_case(
+                            nested_value,
+                            case_handler,
+                            translate_numbers=translate_numbers
+                        )
 
-                new_dict[key] = cls(value, case_handler, translate_numbers=translate_numbers)
+                new_dict[key] = cls(
+                    value,
+                    case_handler,
+                    translate_numbers=translate_numbers
+                )
             elif isinstance(value, list):
                 new_dict[key] = [
-                    cls.recursive_case(item, case_handler)
+                    cls.recursive_case(item, case_handler, translate_numbers=translate_numbers)
                     if isinstance(item, _Mapping)
                     else item for item in value
                 ]
