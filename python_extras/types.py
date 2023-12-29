@@ -8,7 +8,8 @@ __all__ = [
     'SnakedDict',
     'CameledDict',
     'is_decimal',
-    'validate_number'
+    'validate_number',
+    'translate_response'
 ]
 
 _Mapping = Union[Mapping, MutableMapping]
@@ -31,16 +32,17 @@ def is_typed_dict(value: Any, typed_dict: Type[TypedDict]) -> bool:
 
 
 def is_decimal(input_string: str) -> bool:
+    exceptions = (ValueError, AttributeError, IndexError, TypeError)
     try:
         number = float(input_string)
         fraction_length = len(input_string.split('.')[1])
         is_float = input_string == str(format(number, f'.{fraction_length}f'))
-    except (ValueError, AttributeError, IndexError):
+    except exceptions:
         is_float = False
 
     try:
         is_integer = input_string.isdecimal()
-    except (ValueError, AttributeError):
+    except exceptions:
         is_integer = False
 
     return is_float or is_integer
@@ -61,7 +63,7 @@ def validate_number(input_string: str) -> float | int | str:
 
 
 class _MultiCaseDict(UserDict):
-    def __init__(self, __dict: _Mapping | Self, case_handler: Callable[[str], str]):
+    def __init__(self, __dict: _Mapping | Self, case_handler: Callable[[str], str], translate_numbers: bool = False):
         user_cased_dict = __dict if __dict else {}
 
         cased_dict = dict()
@@ -70,6 +72,9 @@ class _MultiCaseDict(UserDict):
 
         for user_key, value in user_cased_dict.items():
             if not (cased_key := case_handler(user_key)) in key_occuring:
+                if translate_numbers:
+                    value = validate_number(value)
+
                 key_occuring.add(cased_key)
                 key_map[cased_key] = user_key
                 cased_dict[cased_key] = value
@@ -86,7 +91,8 @@ class _MultiCaseDict(UserDict):
     def recursive_case(
             cls,
             __dict: _Mapping,
-            case_handler: Callable[[str], str]
+            case_handler: Callable[[str], str],
+            translate_numbers: bool = False
     ) -> Self:
         user_dict = __dict
         new_dict = {}
@@ -96,7 +102,7 @@ class _MultiCaseDict(UserDict):
                     if isinstance(nested_value, _Mapping | _MultiCaseDict):
                         value[nested_key] = cls.recursive_case(nested_value, case_handler)
 
-                new_dict[key] = cls(value, case_handler)
+                new_dict[key] = cls(value, case_handler, translate_numbers=translate_numbers)
             elif isinstance(value, list):
                 new_dict[key] = [
                     cls.recursive_case(item, case_handler)
@@ -106,7 +112,7 @@ class _MultiCaseDict(UserDict):
             else:
                 new_dict[key] = value
 
-        return cls(new_dict, case_handler)
+        return cls(new_dict, case_handler, translate_numbers=translate_numbers)
 
     def pascal_case(self) -> dict:
         pascal_cased_dict = {}
@@ -135,12 +141,23 @@ class _MultiCaseDict(UserDict):
 
 
 class SnakedDict(_MultiCaseDict):
-    def __init__(self, __dict: Optional[dict] = None):
-        snaked_dict = _MultiCaseDict.recursive_case(__dict, snake_case)
-        super().__init__(snaked_dict, snake_case)
+    def __init__(self, __dict: Optional[dict] = None, translate_numbers: bool = False):
+        snaked_dict = _MultiCaseDict.recursive_case(__dict, snake_case, translate_numbers=translate_numbers)
+        super().__init__(snaked_dict, snake_case, translate_numbers=translate_numbers)
 
 
 class CameledDict(_MultiCaseDict):
-    def __init__(self, __dict: Optional[dict] = None):
-        cameled_dict = _MultiCaseDict.recursive_case(__dict, camel_case)
-        super().__init__(cameled_dict, camel_case)
+    def __init__(self, __dict: Optional[dict] = None, translate_numbers: bool = False):
+        cameled_dict = _MultiCaseDict.recursive_case(__dict, camel_case, translate_numbers=translate_numbers)
+        super().__init__(cameled_dict, camel_case, translate_numbers=translate_numbers)
+
+
+def translate_response(response: dict | list, translate_numbers: bool = False) -> dict | list:
+    if isinstance(response, list):
+        if len(response) and isinstance(response[0], dict):
+            for idx, item in enumerate(response):
+                response[idx] = SnakedDict(item, translate_numbers=translate_numbers)
+    elif isinstance(response, dict):
+        response = SnakedDict(response, translate_numbers=translate_numbers)
+
+    return response
